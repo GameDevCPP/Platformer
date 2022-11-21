@@ -1,6 +1,6 @@
 # Platformer
 
-*These notes are an edited version of the notes available at [Games Engineering](https://dooglz.github.io/set09121/pong.html).*
+*These notes are an edited version of the notes available at [Games Engineering](https://dooglz.github.io/set09121/platfomer.html).*
 
 ## Get the Code
 
