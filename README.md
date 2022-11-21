@@ -1,89 +1,286 @@
-# CMake SFML Project Template
 
-This repository template should allow for a fast and hassle-free kick start of your next SFML project using CMake.
-Thanks to [GitHub's nature of templates](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template), you can fork this repository without inheriting its Git history.
+## Get the Code
 
-The template starts out very basic, but might receive additional features over time:
+There is a lot of code behind this practical, it would not be a good use of your time to get you to copy it all manually, so for this practical. You will be provided with most of the code, with some sections left for you to complete.
 
-- Basic CMake script to build your project and link SFML on any operating system
-- Basic [GitHub Actions](https://github.com/features/actions) script for all major platforms
+Get it here : [Repo (code)](https://github.com/edinburgh-napier/set09121/tree/master/code)
 
-## How to Use
+**You don't need to fork the repo or anything special, just download it in some way and then copy the code over to your usual lab repo.**
 
-1. Follow the above instructions about how to use GitHub's project template feature to create your own project.
-1. Open [CMakeLists.txt](CMakeLists.txt). Rename the project and the executable to whatever name you want. The project and executable names don't have to match.
-1. Change the source files listed in [`add_executable`](CMakeLists.txt#L10) to match the source files your project requires.
-1. Configure and build your project. Most popular IDEs support CMake projects with very little effort on your part.
-    - [VS Code](https://code.visualstudio.com) via the [CMake extension](https://code.visualstudio.com/docs/cpp/cmake-linux)
-    - [Visual Studio](https://docs.microsoft.com/en-us/cpp/build/cmake-projects-in-visual-studio?view=msvc-170)
-    - [CLion](https://www.jetbrains.com/clion/features/cmake-support.html)
-    - [Qt Creator](https://doc.qt.io/qtcreator/creator-project-cmake.html)
+The code you have been given contains:
+-   The skeleton code for lab7
+-   The three libraries we have already written. Ecm, LevelLoader, Maths.
+-   A new Library, the "Engine\". (Fully complete, no code to edit)
+-   My completed CMakeLists.txt - for you to check against (**Note, this will have lots of extra stuff you don't need! Just check and grab extra bits as you need them!**)
 
-    Using CMake from the command line is straightforward as well.
+## The Engine
 
-    For a single-configuration generator (typically the case on Linux and macOS):
-    ```
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-    cmake --build build
-    ```
+The Engine library is built upon the knowledge that we gained working on Pacman. Where we started to separate out the engine logic from the game logic and build an abstracted API to interface with SFML.
+Most of the code within the engine should be familiar and understandable to you, it's mostly code we have written before. There are some scary new things, which we will cover in due time, like asynchronous level loading.
 
-    For a multi-configuration generator (typically the case on Windows):
-    ```
-    cmake -S . -B build
-    cmake --build build --config Release
-    ```
-1. Enjoy!
+Don't see the engine code as something you should shy away from just because I've given it to you completed. Have a read, get stuck in, poke about and change some things.
 
-## Upgrading SFML
+### Changes
 
-SFML is found via CMake's [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html) module.
-FetchContent automatically downloads SFML from GitHub and builds it alongside your own code.
-Beyond the convenience of not having to install SFML yourself, this ensures ABI compatability and simplifies things like specifying static versus shared libraries.
+There have been some changes to the other libraries, some bugfixes, and some small additions that wouldn't have made sense when we first built them. However it was necessary to do some tweaks to help build the engine. This is why I have also given you the code to the three helper libraries. Feel free to copy them wholesale to keep in sync.
 
-Modifying what version of SFML you want is as easy as changing the [`GIT_TAG`](CMakeLists.txt#L7) argument.
-Currently it uses the latest in-development version of SFML 2 via the `2.6.x` tag.
-If you're feeling adventurous and want to give SFML 3 a try, use the `master` tag.
-Beware, this requires changing your code to suit the modified API!
-The nice folks in the [SFML community](https://github.com/SFML/SFML#community) can help you with that transition and the bugs you may encounter along the way.
+Summary of big changes
+-   ECM: Entities can have String Tags associated with them, scenes can be searched for entities with tags.
+-   LevelSystem: A compression stage happens before generating sprites. This groups similar tiles into one large sprite. This help massively with rendering and physics performance.
+-   LevelSystem: Can now read, parse, and lookup any character from a level file. The ENUM is still there and working to give helpful names to certain values
 
-## But I want to...
 
-Modify CMake options by adding them as configuration parameters (with a `-D` flag) or by modifying the contents of CMakeCache.txt and rebuilding.
+## The Game Loop
 
-### Use Static Libraries
+Let's step through our new execution environment, starting with `platformer.cpp`
 
-By default SFML builds shared libraries and this default is inherited by your project.
-CMake's [`BUILD_SHARED_LIBS`](https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html) option lets you pick static or shared libraries for the entire project.
+```cpp
+//platformer.cpp
+#include "engine.h"
+#include "game.h"
 
-### Change Compilers
+using namespace std;
 
-See the variety of [`CMAKE_<LANG>_COMPILER`](https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER.html) options.
-In particular you'll want to modify `CMAKE_CXX_COMPILER` to point to the C++ compiler you wish to use.
+MenuScene menu;
+Level1Scene level1;
+Level2Scene level2;
+Level3Scene level3;
 
-### Change Compiler Optimizations
+int main() {
+  Engine::Start(1280, 720, "Platformer",&menu);
+}
+```
 
-CMake abstracts away specific optimizer flags through the [`CMAKE_BUILD_TYPE`](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html) option.
-By default this project recommends `Release` builds which enable optimizations.
-Other build types include `Debug` builds which enable debug symbols but disable optimizations.
-If you're using a multi-configuration generator (as is often the case on Windows), you can modify the [`CMAKE_CONFIGURATION_TYPES`](https://cmake.org/cmake/help/latest/variable/CMAKE_CONFIGURATION_TYPES.html#variable:CMAKE_CONFIGURATION_TYPES) option.
+Wow, now that's simple. Obviously we have 'magic'd' away all the work we used to have to do. It's all down in the Engine.cpp. The point here is that we are in **Game** code, which shouldn't need to care about the implementation underneath. Game code shouldn't care if we are using SFML or some other rendering framework, game code should only care about Game logic.
 
-### Change Generators
+In practise there isn't this perfect abstraction, we still include plenty of SFML headers throughout the game code. We could replace all this with an engine abstraction layer, but that would be over-engineering and possibly a performance hit. It's that balance of clean-software engineering versus optimal and fast code again, only your experience building these systems can guide you to making the right architecture decisions.
 
-While CMake will attempt to pick a suitable default generator, some systems offer a number of generators to choose from.
-Ubuntu, for example, offers Makefiles and Ninja as two potential options.
-For a list of generators, click [here](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).
-To modify the generator you're using you must reconfigure your project providing a `-G` flag with a value corresponding to the generator you want.
-You can't simply modify an entry in the CMakeCache.txt file unlike the above options.
-Then you may rebuild your project with this new generator.
+Let's take a peak at what that Engine::Start call did down in the Engine:
 
-## More Reading
+```cpp
+//"engine.cpp"
 
-Here are some useful resources if you want to learn more about CMake:
+void Engine::Start(unsigned int width, unsigned int height,
+                   const std::string& gameName, Scene* scn) {
+  RenderWindow window(VideoMode(width, height), gameName);
+  _gameName = gameName;
+  _window = &window;
+  Renderer::initialise(window);
+  Physics::initialise();
+  ChangeScene(scn);
+  while (window.isOpen()) {
+   // Usual Game loop stuff
+  }
+  if (_activeScene != nullptr) {
+    _activeScene->UnLoad();
+    _activeScene = nullptr;
+  }
+  window.close();
+  Physics::shutdown();
+}
+```
 
-- [How to Use CMake Without the Agonizing Pain - Part 1](https://alexreinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-1.html)
-- [How to Use CMake Without the Agonizing Pain - Part 2](https://alexreinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-2.html)
-- [Better CMake YouTube series by Jefferon Amstutz](https://www.youtube.com/playlist?list=PL8i3OhJb4FNV10aIZ8oF0AA46HgA2ed8g)
+There's our usual game loop! It's never that far away.
 
-## License
+Some new init and shut-down code has been added, and we have `_activeScene` to keep track of the current level that should be updated and rendered.
 
-The source code is dual licensed under Public Domain and MIT -- choose whichever you prefer.
+That `ChangeScene` call is new, let's take a look at what that does:
+
+```cpp
+//"engine.cpp"
+void Engine::ChangeScene(Scene* s) {
+  cout << "Eng: changing scene: " << s << endl;
+  auto old = _activeScene;
+  _activeScene = s;
+
+  if (old != nullptr) {
+    old->UnLoad();
+  }
+
+  if (!s->isLoaded()) {
+    cout << "Eng: Entering Loading Screen\n";
+    loadingTime =0;
+    _activeScene->LoadAsync();
+    loading = true;
+  }
+}
+```
+
+What we have here is a system to switch scenes, first it un-loads the current scene, then loads the new scene. Scenes have two loading methods, Load() and LoadAsync(). Let's talk about that.
+
+## Scene Loading
+
+### Synchronous loading
+
+`Scene.Load()` Does what you would expect. It's a normal function doing normal things for normal people. It's basically a constructor for a scene, that can be called repeatedly (note: scene's constructors are deleted, you can't call them). A scene shouldn't be `Updated()` or `Rendered()` until `Load()` has completed and `Scene.isLoaded() == true`;
+
+### Asynchronous loading
+
+`Scene.LoadAsync()` Shifts us into another dimension of software engineering: Concurrency. Simply put, this function calls the standard `Load()` function, *but in the background*. This means we can do something else while it is loading, like update and render a loading screen!
+
+
+### Games and Concurrency
+
+This is a big and complicated topic, and we have a separate module just for this
+[Concurrent and Parallel Systems](https://github.com/edinburgh-napier/set10108)
+
+This is just a small toe-dip into the topic, and the code is already all written for you. What we are dealing with here is Multithreading. Using more than just one of those CPU cores that we have to gain us some more performance.
+
+Multi-threading for games is a bit tricky, some things can be parallelised easy(background asset loading), some things are almost impossible(Updating a complex set of interconnected Entities). It's not a silver bullet to give us more FPS. But for developers on current-gen consoles, it's a must-have to squeeze out every last drop of performance out of the hardware.
+
+#### Checking up on the background task
+
+While the level is loading in the background, we need to know when it is finished. For this I have used a `std::future` guarded by a `std::mutex` inside `Scene::isLoaded()`. Don't worry about what that means or how that works for now, just know why that code is there.
+
+#### Debugging
+
+Important tip!
+
+If your game crashes or throws an exception while loading Asynchronously, it can be difficult to debug. In this case, switch out the line in `Engine::ChangeScene` from
+
+`_activeScene->LoadAsync();`
+
+to
+
+`_activeScene->Load();`
+
+To temporarily disable background loading (Loading screen will never show, and game will hang as the scene loads).
+
+
+## Scene 1
+
+With *how* Levels are loaded covered, take a look at scene_level1.cpp. This is where our Game Kicks off (scene_menu is first, but that's boring).
+
+```cpp
+//"scene_level1.cpp"
+void Level1Scene::Load() {
+  ls::loadLevelFile("res/level_1.txt", 40.0f);
+  ...
+
+  // Create player
+  {
+    player = makeEntity();
+    ...
+    player->addComponent<ShapeComponent>();
+    player->addComponent<PlayerPhysicsComponent>(Vector2f(20.f, 30.f));
+  }
+
+  // Add physics colliders to level tiles.
+  {
+    auto walls = ls::findTiles(ls::WALL);
+    for (auto w : walls) {
+      ...
+      auto e = makeEntity();
+      e->addComponent<PhysicsComponent>(false, Vector2f(40.f, 40.f));
+    }
+  }
+
+  //Simulate long loading times for this scene, so we see the loading screen
+  std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+  setLoaded(true);
+}
+```
+
+
+All the work is in the Load(). The Update() does very little -- only checking to see if the player has reached the end. This is the beautify of the Entity Component Model. Just build our level from your box of parts(components) and the game logic makes itself (almost Emergent behaviour).
+
+
+## Components
+
+We have some familiar components in use: ShapeComponent, which is unchanged. The two new components on the scene are PhysicsComponent and it's child: PlayerPhysicsComponent. This is how we are going to integrate Box2d into our engine, as components.
+
+There is a PhysicsSystem located in the engine/system\_physics.cpp. This doesn't do much other than house some maths functions and the world.Step(); Most of our Box2D code lies in the components.
+
+### Physics Component
+
+The base PhysicsComponent in cmp\_physics.cpp is perhaps our most complex component yet. Many of it's function are getters and setters to interface correctly with SFML and Box2d maths, and as an interface to change physics properties.
+
+The constructor does the same logic that we had in the physics practical, creating either a static or dynamic body.
+
+Then there are some new functions such as isTouching() and getTouching(), which we can use to interface gamelogic with collisions. Frustratingly the B2D API flips interchangeably between C and C++.
+
+```cpp
+//Some of the B2D code is done in a C++ way:  
+_fixture->getSomething()->doSomething();
+
+// and some code is bit oldschool
+Thing thing;
+_fixture->getSomething(&thing);
+thing.doSomething();
+```
+
+Keep a lookout for this when dealing with B2D directly, and take care with raw pointers.
+
+#### Movement Gotcha
+
+Take a look at the Update():
+
+```cpp
+void PhysicsComponent::update(double dt) {
+  _parent->setPosition(invert_height(bv2_to_sv2(_body->GetPosition())));
+  _parent->setRotation((180 / b2_pi) * _body->GetAngle());
+}
+```
+
+This is how the physics world is linked to the SFML/Entity world. This happens every frame. There is one huge problem with this:
+-   The PhysicsComponent is now in charge of the Entities position.
+-   If anything modifies the Entities position (i.e another component), the physics component will overwrite this change with it's own value copied form the physics world.
+
+We *can* still move Entities manually, by calling PhysicsComponent.teleport(), but we have to *know* that an Entity has a physics object beforehand.
+
+This gets complex if we wanted this logic inside a component. What we have done is made certain component *incompatible*. I haven't included a solution to this in the current Engine, as we don't need it. For your coursework you may run into this problem, there are a few solutions, but I'll leave that to you to figure out.
+
+So that's the Physics Component, it does a lot, but nothing complicated. It's Child PlayerPhysicsComponent is where things get weird.
+
+
+### Player Physics Component
+Inheriting from PhysicsComponent, the PlayerPhysicsComponent is what drives the player.
+
+Inside you will find:
+-   A constructor - Set's some relevant physics flags, nothing fancy
+-   A rather complicated Update()
+-   bool isGrounded() - detect if the player is standing on something.
+
+#### The Player Update
+
+As described in the lectures, players characters usually don't obey the rules of physics. They *look* like they do, but they cheat and bend physics to make the game *feel* responsive and fast.
+
+See: [Tommy Refenes' on the physics of Super Meat Boy](https://youtu.be/QVpSIdWE0do?t=43m55s)
+
+To make the player *feel* right, we do several things:
+-   Dampen X Movement if not moving left or right (essentially apply handbrake to player if no keys are pressed)
+-   Apply impulse to move left or right, only if currently going slower than a max velocity.
+-   Jump, only if on the ground.
+-   Kill all Y velocity at the start of the jump
+-   Jump teleports slightly upwards first, then applies an impulse
+-   If not on the ground - player has no friction
+-   After everything - clamp velocity to a maximum value
+
+
+None of these things are an industry standard, it a method that I've adopted after doing this a few times. There are better ways, but this way *works*, but may not work for your game.
+
+
+## Run The Scene
+
+You shouldn't need to edit anything to get the Menu and first level running. Give it a go and bounce around.
+
+## Scene 2
+
+There is some code missing form the scene\_level2.cpp file for you to complete.
+This scene incorporates a non-physics moving object (using EnemyAIComponent), and a cool new Turret (EnemyTurretComponent) that fires physical bullets. There are two more new components in use here:
+-   The BulletComponent is just a countdown timer that deletes \_parent when it reaches 0;
+-   The HurtComponent, check for (fake) collision with the player and kills the player.
+
+## Scene 3
+
+The same goes for Scene 3. This scene is easier than Scene 2, just the player and physics components to add.
+
+## Phew!
+
+Look at that, you've now going a working game, with multiple levels. Cool, huh? Remember: all of what is here is designed to be modified, broken, fixed, used, altered, changed, tweaked, and generally messed around with. Want a different type of movement for your game? Go add it then! Want new physics objects? Well, you can use Box2D can't ya?
+
+The ball really is in your court from now on: go make something awesome!
+
+Previous step: [Physics](physics)
+
+Next step: [Steering](lab8_1)
